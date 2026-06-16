@@ -231,27 +231,55 @@ void setTempRelay(bool on) {
 
 // ════════════════════════════════════════════════════════════════
 //  MQ135 — compute air quality from ADC reading
+//  Phase 1: math guards prevent overflow (vAO clamp, Rs/ratio caps)
+//  Phase 2: median filter rejects ADC spikes (replaces averaging)
 // ════════════════════════════════════════════════════════════════
 
+// Bubble-sort for small burst; callable before medianOf (which works on int*)
+static float medianOfFloat(float* buf, int size) {
+  float tmp[MQ135_SAMPLES];
+  memcpy(tmp, buf, size * sizeof(float));
+  for (int i = 0; i < size - 1; i++)
+    for (int j = 0; j < size - i - 1; j++)
+      if (tmp[j] > tmp[j+1]) { float t = tmp[j]; tmp[j] = tmp[j+1]; tmp[j+1] = t; }
+  return tmp[size / 2];
+}
+
 void computeMQ135() {
-  int raw = 0;
+  // ── Phase 2: burst-sample → median (rejects spikes) ─────────
+  float rawSamples[MQ135_SAMPLES];
   for (int i = 0; i < MQ135_SAMPLES; i++) {
-    raw += analogRead(MQ135_PIN);
+    rawSamples[i] = (float)analogRead(MQ135_PIN);
     delay(5);
   }
-  raw /= MQ135_SAMPLES;
+  float raw = medianOfFloat(rawSamples, MQ135_SAMPLES);
 
   float vADC = (raw / 4095.0f) * 3.3f;
   float vAO  = vADC * (MQ135_R1 + MQ135_R2) / MQ135_R2;
 
-  if (vADC < 0.01f) return;
+  // ── Phase 1: clamp vAO — it physically cannot exceed sensor VCC ─
+  if (vAO > MQ135_VCC) vAO = MQ135_VCC;
+
+  // Guard: open circuit / dead sensor
+  if (vAO < 0.01f) return;
 
   float Rs    = ((MQ135_VCC - vAO) / vAO) * MQ135_R2;
-  if (Rs < 0.0f) Rs = 0.0f;
+
+  // ── Phase 1: minimum Rs prevents ratio→0 → pow(0,−b)=∞ ─────
+  if (Rs < 1.0f)   Rs = 1.0f;
+  if (Rs > 1e6f)   Rs = 1e6f;
 
   float ratio = Rs / MQ135_RO;
-  aqPPM       = MQ135_PARA * pow(ratio, -MQ135_PARB);
-  if (aqPPM < 0.0f) aqPPM = 0.0f;
+
+  // ── Phase 1: clamp ratio bounds the power-law domain ─────────
+  if (ratio < 0.001f)  ratio = 0.001f;
+  if (ratio > 1000.0f) ratio = 1000.0f;
+
+  aqPPM = MQ135_PARA * pow(ratio, -MQ135_PARB);
+
+  // ── Phase 1: cap result to sane range ────────────────────────
+  if (aqPPM < 0.0f)      aqPPM = 0.0f;
+  if (aqPPM > 10000.0f)  aqPPM = 10000.0f;
 
   aqPercent = constrain(
     (1.0f - (aqPPM - AQ_GOOD) / (AQ_BAD - AQ_GOOD)) * 100.0f,
