@@ -312,6 +312,7 @@ Open `http://<ip>/` in a browser to access the dashboard.
 | `pi/bridge.py`      | MQTT → InfluxDB bridge (run on Raspberry Pi)         |
 | `pi/aquaponic-bridge.service` | systemd unit for bridge.py                  |
 | `INSTALL.md`         | Step-by-step installation guide (hardware + software) |
+| `QUICKSTART.md`      | Minimal copy-paste setup — get running in 15 min   |
 | `Documentation.md`   | System architecture + reference document     |
 
 ---
