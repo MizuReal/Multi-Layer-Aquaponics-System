@@ -72,8 +72,9 @@ Seven independent timers run in `loop()` without blocking the main thread:
 | 5     | 1000 ms| Read pH ADC, evaluate GSM alert                  |
 | 6     | 5000 ms| Read MQ135 ADC, compute air quality, update relay|
 | 7     | 2000 ms| Read ultrasonic median distance, update water pump|
+| 8     | 2000 ms| MQTT publish sensor JSON to broker               |
 
-Timer 7 (ultrasonic) uses `pulseIn()` which blocks for up to ~38 ms per sample (×5 samples with 30 ms delays ≈ 310 ms total). This is acceptable within a 2 s window and does not conflict with the other timer intervals.
+Timer 7 (ultrasonic) uses `pulseIn()` which blocks for up to ~38 ms per sample (×5 samples with 30 ms delays ≈ 310 ms total). Timer 8 publishes the full sensor JSON to the MQTT broker at 2000 ms intervals (same rate as the web dashboard refresh). Both are non-critical and do not interfere with sensor/actuator timers.
 
 ### 3.2 GSM Initialisation (auto-baud)
 
@@ -162,7 +163,100 @@ Auto-refresh every 2 seconds via `setInterval(fetchData, 2000)`.
 
 ---
 
-## 5. Setup Instructions
+## 5. MQTT Publishing
+
+The ESP32 publishes sensor data to an MQTT broker (Mosquitto on Raspberry Pi) in parallel with serving the web dashboard. The JSON payload is identical to the `/data` endpoint.
+
+### 5.1 MQTT Topics
+
+| Topic             | QoS | Retained | Payload          | Publisher  |
+|-------------------|-----|----------|------------------|------------|
+| `aquaponic/data`  | 0   | yes      | Full sensor JSON | ESP32      |
+| `aquaponic/status`| 0   | yes      | `"online"`/`"offline"` | ESP32 |
+
+`aquaponic/status` uses MQTT Last Will: if the ESP32 disconnects unexpectedly, the broker auto-publishes `"offline"`.
+
+### 5.2 Configuration
+
+Edit these defines in `Compilation.ino`:
+
+```cpp
+#define MQTT_BROKER      "192.168.1.100"  // Raspberry Pi IP
+#define MQTT_PORT         1883
+#define MQTT_CLIENT_ID    "ESP32_Aquaponic"
+#define MQTT_TOPIC_DATA   "aquaponic/data"
+#define MQTT_TOPIC_STATUS "aquaponic/status"
+#define MQTT_PUB_INTERVAL 2000
+```
+
+### 5.3 Packet Size
+
+The JSON payload is ~520 bytes. PubSubClient defaults to 256 bytes max. `MQTT_MAX_PACKET_SIZE` is set to **768** before including the library to accommodate the payload.
+
+---
+
+## 6. Raspberry Pi Setup
+
+The Raspberry Pi runs four services: Mosquitto (MQTT broker), InfluxDB v2 (time-series database), a Python bridge (MQTT → InfluxDB), and Grafana (web dashboards).
+
+### 6.1 Mosquitto MQTT Broker
+
+```bash
+sudo apt update && sudo apt install -y mosquitto mosquitto-clients
+sudo systemctl enable --now mosquitto
+```
+
+Verify:
+```bash
+mosquitto_sub -t 'aquaponic/#' -v
+```
+
+### 6.2 InfluxDB v2
+
+```bash
+sudo apt install -y influxdb2
+sudo systemctl enable --now influxdb
+```
+
+Visit `http://<pi-ip>:8086` and:
+1. Create organisation: `aquaponic`
+2. Create bucket: `sensor_data` (retention: 30d)
+3. Generate a read/write API token
+
+### 6.3 Python MQTT → InfluxDB Bridge
+
+```bash
+pip3 install paho-mqtt influxdb-client
+```
+
+Copy `pi/bridge.py` to the Raspberry Pi, set the token:
+
+```bash
+export INFLUX_TOKEN='your-token-here'
+python3 bridge.py
+```
+
+Or install as a systemd service:
+
+```bash
+sudo cp pi/aquaponic-bridge.service /etc/systemd/system/
+# Edit /etc/systemd/system/aquaponic-bridge.service → set INFLUX_TOKEN
+sudo systemctl daemon-reload
+sudo systemctl enable --now aquaponic-bridge
+```
+
+### 6.4 Grafana
+
+```bash
+sudo apt install -y grafana
+sudo systemctl enable --now grafana-server
+```
+
+Visit `http://<pi-ip>:3000` → login `admin`/`admin` → add InfluxDB data source → build dashboards.
+
+---
+
+## 7. Setup Instructions
 
 1. **Power**: ESP32 via USB or 5V regulator. SIM800L requires 3.7–4.2 V @ 2 A (LiPo or LM2596 buck converter from 5 V).
 2. **Wiring**: Follow pin mapping table in Section 2. Voltage dividers on pH and ultrasonic ECHO are mandatory.
@@ -179,10 +273,11 @@ Auto-refresh every 2 seconds via `setInterval(fetchData, 2000)`.
    - `BH1750` (by Christopher Laws)
    - `OneWire` (by Jim Studt et al.)
    - `DallasTemperature` (by Miles Burton)
+   - `PubSubClient` (by Nick O'Leary)
 
 ---
 
-## 6. Build & Flash
+## 8. Build & Flash
 
 ```bash
 # PlatformIO (recommended)
@@ -204,19 +299,23 @@ Open `http://<ip>/` in a browser to access the dashboard.
 
 ---
 
-## 7. File Manifest
+## 9. File Manifest
 
-| File               | Purpose                                         |
-|--------------------|-------------------------------------------------|
-| `Compilation.ino`  | Main merged firmware (all sensors + actuators)  |
-| `GSM800.ino`       | Standalone SIM800L debug/tester (reference)     |
-| `TempSensor.ino`   | Standalone DS18B20 + relay tester (reference)   |
-| `Ultrasonic.ino`   | Standalone AJ-SR04M water level tester (ref)    |
-| `Documentation.md` | This document                                   |
+| File                | Purpose                                              |
+|---------------------|------------------------------------------------------|
+| `Compilation.ino`   | Main firmware — pins, config, state, helpers, loop   |
+| `Mqtt.ino`          | MQTT JSON builder + broker connection                |
+| `WebServer.ino`     | HTTP handlers — dashboard HTML + `/data` endpoint    |
+| `GSM800.ino`        | Standalone SIM800L debug/tester (reference)          |
+| `TempSensor.ino`    | Standalone DS18B20 + relay tester (reference)        |
+| `Ultrasonic.ino`    | Standalone AJ-SR04M water level tester (reference)   |
+| `pi/bridge.py`      | MQTT → InfluxDB bridge (run on Raspberry Pi)         |
+| `pi/aquaponic-bridge.service` | systemd unit for bridge.py                  |
+| `Documentation.md`  | This document                                        |
 
 ---
 
-## 8. Troubleshooting
+## 10. Troubleshooting
 
 | Symptom                      | Likely Cause                                  |
 |------------------------------|-----------------------------------------------|
@@ -227,3 +326,6 @@ Open `http://<ip>/` in a browser to access the dashboard.
 | Temp relay never triggers    | Threshold mismatch, check aquarium heater     |
 | Dashboard not loading        | WiFi not connected, check IP in Serial Monitor|
 | SMS not sending              | SIM not activated, no credit, or 2G only      |
+| MQTT not publishing          | Broker IP wrong or Pi firewall blocks 1883     |
+| PubSubClient compile error   | `MQTT_MAX_PACKET_SIZE` must be defined before `#include <PubSubClient.h>` |
+| Grafana shows gaps           | Check bridge.py logs; verify INFLUX_TOKEN      |

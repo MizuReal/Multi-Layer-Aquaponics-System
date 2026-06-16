@@ -1,0 +1,25 @@
+[Unit]
+Description=Aquaponic MQTT to InfluxDB Bridge
+After=network.target mosquitto.service influxdb.service
+Wants=mosquitto.service influxdb.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/aquaponic-bridge
+ExecStart=/usr/bin/python3 /home/pi/aquaponic-bridge/bridge.py
+Restart=always
+RestartSec=10
+
+# ── Configure these ──────────────────────────────────────────
+Environment=MQTT_BROKER=localhost
+Environment=MQTT_PORT=1883
+Environment=MQTT_TOPIC=aquaponic/data
+Environment=INFLUX_URL=http://localhost:8086
+Environment=INFLUX_TOKEN=your-influxdb-token-here
+Environment=INFLUX_ORG=aquaponic
+Environment=INFLUX_BUCKET=sensor_data
+# ─────────────────────────────────────────────────────────────
+
+[Install]
+WantedBy=multi-user.target
