@@ -311,7 +311,8 @@ Open `http://<ip>/` in a browser to access the dashboard.
 | `Ultrasonic.ino`    | Standalone AJ-SR04M water level tester (reference)   |
 | `pi/bridge.py`      | MQTT → InfluxDB bridge (run on Raspberry Pi)         |
 | `pi/aquaponic-bridge.service` | systemd unit for bridge.py                  |
-| `Documentation.md`  | This document                                        |
+| `INSTALL.md`         | Step-by-step installation guide (hardware + software) |
+| `Documentation.md`   | System architecture + reference document     |
 
 ---
 
