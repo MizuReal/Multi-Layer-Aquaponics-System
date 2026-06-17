@@ -311,6 +311,10 @@ Open `http://<ip>/` in a browser to access the dashboard.
 | `Ultrasonic.ino`    | Standalone AJ-SR04M water level tester (reference)   |
 | `pi/bridge.py`      | MQTT → InfluxDB bridge (run on Raspberry Pi)         |
 | `pi/aquaponic-bridge.service` | systemd unit for bridge.py                  |
+| `webserver/app.py`   | Flask + MQTT + SSE — Pi-hosted web dashboard        |
+| `webserver/templates/index.html` | Dashboard HTML + Chart.js (6 live graphs) |
+| `webserver/aquaponic-web.service` | systemd unit for web dashboard            |
+| `webserver/SETUP.md` | Step-by-step guide for the Pi web dashboard          |
 | `INSTALL.md`         | Step-by-step installation guide (hardware + software) |
 | `QUICKSTART.md`      | Minimal copy-paste setup — get running in 15 min   |
 | `Documentation.md`   | System architecture + reference document     |

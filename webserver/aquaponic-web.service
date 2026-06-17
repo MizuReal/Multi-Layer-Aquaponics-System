@@ -1,0 +1,19 @@
+[Unit]
+Description=Aquaponic Web Dashboard
+After=network.target mosquitto.service
+Wants=mosquitto.service
+
+[Service]
+Type=simple
+User=sap2-ns
+WorkingDirectory=/home/sap2-ns/webserver
+ExecStart=/usr/bin/python3 /home/sap2-ns/webserver/app.py
+Restart=always
+RestartSec=10
+Environment=WEB_PORT=5500
+Environment=MQTT_BROKER=localhost
+Environment=MQTT_PORT=1883
+Environment=MQTT_TOPIC=aquaponic/data
+
+[Install]
+WantedBy=multi-user.target
