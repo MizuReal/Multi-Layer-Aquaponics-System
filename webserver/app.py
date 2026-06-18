@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-Aquaponic Web Dashboard — Flask + MQTT
-Polls /data every 2s on the frontend — no SSE complexity.
-
-Start manually:   python3 app.py
-Start as service: sudo systemctl enable --now aquaponic-web
+Aquaponic Web Dashboard — Flask + MQTT + Live MJPEG Video
+Frontend polls /data every 2s. Video streamed as MJPEG from rpicam-vid.
+Classification reads frames from the live video pipe — no second camera process.
 """
 
 import json
 import os
+import subprocess
 import threading
 
 import paho.mqtt.client as mqtt
-from flask import Flask, render_template, jsonify
+from flask import Flask, Response, render_template, jsonify
+
+from classifier import get_counts, start_classifier
 
 # ── Configuration ─────────────────────────────────────────────────
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
@@ -20,11 +21,15 @@ MQTT_PORT   = int(os.getenv("MQTT_PORT",   "1883"))
 MQTT_TOPIC  = os.getenv("MQTT_TOPIC",  "aquaponic/data")
 WEB_PORT    = int(os.getenv("WEB_PORT",  "5500"))
 
-# ── Thread-safe state ────────────────────────────────────────────
-latest_data = {}
-lock = threading.Lock()
+# ── Shared frame buffer ───────────────────────────────────────────
+LATEST_FRAME = "/tmp/aquaponic_latest.jpg"
+frame_lock = threading.Lock()
 
-# ── Flask routes ──────────────────────────────────────────────────
+# ── Thread-safe MQTT state ────────────────────────────────────────
+latest_data = {}
+data_lock = threading.Lock()
+
+# ── Flask ─────────────────────────────────────────────────────────
 app = Flask(__name__)
 
 @app.route("/")
@@ -33,8 +38,68 @@ def index():
 
 @app.route("/data")
 def data():
-    with lock:
+    with data_lock:
         return jsonify(latest_data)
+
+@app.route("/count")
+def fish_count():
+    return jsonify(get_counts())
+
+# ── Live MJPEG video (hardware-encoded, ~5% CPU) ──────────────────
+def _video_generator():
+    cmd = [
+        "rpicam-vid",
+        "-t", "0",               # run indefinitely
+        "--codec", "mjpeg",       # hardware MJPEG encoder
+        "--width", "640",
+        "--height", "480",
+        "--framerate", "10",
+        "-o", "-",               # stdout
+        "-n"                      # no preview window
+    ]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, bufsize=0)
+
+    buf = bytearray()
+    try:
+        while True:
+            chunk = proc.stdout.read(4096)
+            if not chunk:
+                break
+            buf.extend(chunk)
+
+            # Extract complete JPEG frames (SOI FF D8 … EOI FF D9)
+            while True:
+                soi = buf.find(b'\xff\xd8')
+                if soi == -1:
+                    break
+                eoi = buf.find(b'\xff\xd9', soi + 2)
+                if eoi == -1:
+                    break
+
+                frame = bytes(buf[soi:eoi + 2])
+                buf = buf[eoi + 2:]
+
+                # Atomic write — classifier reads a complete frame
+                tmp = LATEST_FRAME + ".tmp"
+                with open(tmp, "wb") as f:
+                    f.write(frame)
+                os.replace(tmp, LATEST_FRAME)
+
+                yield (b"--frame\r\n"
+                       b"Content-Type: image/jpeg\r\n\r\n" +
+                       frame + b"\r\n")
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+@app.route("/video")
+def video():
+    return Response(_video_generator(),
+                    mimetype="multipart/x-mixed-replace; boundary=frame")
 
 # ── MQTT subscriber (background thread) ──────────────────────────
 def on_connect(client, userdata, flags, rc):
@@ -48,11 +113,11 @@ def on_connect(client, userdata, flags, rc):
 def on_message(client, userdata, msg):
     global latest_data
     try:
-        data = json.loads(msg.payload.decode())
+        d = json.loads(msg.payload.decode())
     except json.JSONDecodeError:
         return
-    with lock:
-        latest_data = data
+    with data_lock:
+        latest_data = d
 
 def mqtt_loop():
     client = mqtt.Client(client_id="aquaponic_web")
@@ -64,5 +129,6 @@ def mqtt_loop():
 # ── Main ──────────────────────────────────────────────────────────
 if __name__ == "__main__":
     threading.Thread(target=mqtt_loop, daemon=True).start()
+    start_classifier()
     print(f"Dashboard → http://0.0.0.0:{WEB_PORT}")
     app.run(host="0.0.0.0", port=WEB_PORT, debug=False, threaded=True)

@@ -261,6 +261,36 @@
   </div>
 </div>
 
+<!-- ═══ CAMERA ════════════════════════════════════════════════ -->
+<div class="section-head">&#x1F4F7; Tank Camera (refreshes with classification)</div>
+<div class="main-grid">
+  <div class="card" style="padding:12px;text-align:center">
+    <img id="camera-img" src="/video" style="width:100%;max-width:640px;border-radius:8px;border:1px solid var(--border)" alt="Live video">
+    <div class="card-sub" id="camera-sub" style="margin-top:8px">Live — 10 FPS MJPEG (hardware encoded)</div>
+  </div>
+</div>
+
+<!-- ═══ SPECIES DETECTION ═══════════════════════════════════════ -->
+<div class="section-head">&#x1F41F; Species Detection (YOLO — every 30s)</div>
+<div class="gsm-grid">
+  <div class="actuator-card">
+    <div class="a-label">black_fish</div>
+    <div class="card-value" id="count-black_fish" style="font-size:28px">—</div>
+  </div>
+  <div class="actuator-card">
+    <div class="a-label">Fishes</div>
+    <div class="card-value" id="count-Fishes" style="font-size:28px">—</div>
+  </div>
+  <div class="actuator-card">
+    <div class="a-label">pink_fish</div>
+    <div class="card-value" id="count-pink_fish" style="font-size:28px">—</div>
+  </div>
+  <div class="actuator-card" style="border-color: var(--accent)">
+    <div class="a-label">Total Fish</div>
+    <div class="card-value" id="count-total" style="font-size:36px;color:var(--accent)">—</div>
+  </div>
+</div>
+
 <div class="footer">Aquaponic System &bull; Raspberry Pi &bull; MQTT live feed &bull; Charts: 5-min rolling window</div>
 
 <script>
@@ -441,6 +471,23 @@ async function fetchData() {
 
 fetchData();
 setInterval(fetchData, 2000);
+
+// ═══════════════════════════════════════════════════════════════
+//  Fish count polling — every 30s (Roboflow free-tier safe)
+// ═══════════════════════════════════════════════════════════════
+async function fetchCounts() {
+  try {
+    const res = await fetch('/count');
+    if (!res.ok) return;
+    const c = await res.json();
+    $('count-black_fish').textContent = c.black_fish ?? '—';
+    $('count-Fishes').textContent     = c.Fishes     ?? '—';
+    $('count-pink_fish').textContent  = c.pink_fish  ?? '—';
+    $('count-total').textContent      = c.total      ?? '—';
+  } catch(e) { /* silently retry next poll */ }
+}
+setInterval(fetchCounts, 30000);
+fetchCounts();
 </script>
 </body>
 </html>
