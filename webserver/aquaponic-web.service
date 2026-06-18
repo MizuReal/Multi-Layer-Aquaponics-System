@@ -5,9 +5,9 @@ Wants=mosquitto.service
 
 [Service]
 Type=simple
-User=sap2-ns
-WorkingDirectory=/home/sap2-ns/webserver
-ExecStart=/usr/bin/python3 /home/sap2-ns/webserver/app.py
+User=sap2ns
+WorkingDirectory=/home/sap2ns/webserver
+ExecStart=/usr/bin/python3 /home/sap2ns/webserver/app.py
 Restart=always
 RestartSec=10
 Environment=WEB_PORT=5500

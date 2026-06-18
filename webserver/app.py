@@ -47,18 +47,17 @@ def fish_count():
 
 # ── Live MJPEG video (hardware-encoded, ~5% CPU) ──────────────────
 def _video_generator():
-    cmd = [
-        "rpicam-vid",
-        "-t", "0",               # run indefinitely
-        "--codec", "mjpeg",       # hardware MJPEG encoder
-        "--width", "640",
-        "--height", "480",
-        "--framerate", "10",
-        "-o", "-",               # stdout
-        "-n"                      # no preview window
-    ]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                            stderr=subprocess.DEVNULL, bufsize=0)
+    try:
+        proc = subprocess.Popen(
+            ["rpicam-vid", "-t", "0", "--codec", "mjpeg",
+             "--width", "640", "--height", "480", "--framerate", "10",
+             "-o", "-", "-n"],
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0
+        )
+    except FileNotFoundError:
+        yield (b"--frame\r\nContent-Type: text/plain\r\n\r\n"
+               b"Camera not available: rpicam-vid not found\r\n")
+        return
 
     buf = bytearray()
     try:

@@ -9,7 +9,12 @@ import os
 import threading
 import time
 
-import requests
+try:
+    import requests
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
+    print("[classifier] 'requests' not installed — classification disabled")
 
 # ── Configuration ─────────────────────────────────────────────────
 LATEST_FRAME    = "/tmp/aquaponic_latest.jpg"
@@ -26,6 +31,8 @@ lock = threading.Lock()
 
 # ── Roboflow REST call ────────────────────────────────────────────
 def classify():
+    if not HAS_REQUESTS:
+        return []
     if not os.path.exists(LATEST_FRAME):
         return []
     try:
