@@ -1,220 +1,213 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Multi-Layer Aquaponic System</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg:        #f0f4f8;
-      --surface:   #ffffff;
-      --surface2:  #e8edf2;
-      --border:    #d0d8e4;
-      --text:      #1a2332;
-      --muted:     #5a6a80;
-      --good:      #2e7d32;
-      --warn:      #e65100;
-      --bad:       #c62828;
-      --accent:    #1565c0;
-      --teal:      #00695c;
-      --radius:    10px;
-      --font:      'Segoe UI', Arial, sans-serif;
-    }
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-    }
-    .header {
-      background: var(--accent);
-      border-bottom: 3px solid #0d47a1;
-      padding: 20px 24px 16px;
-      display: flex; flex-direction: column; gap: 6px;
-    }
-    .header .title {
-      font-size: 26px; font-weight: 800;
-      color: #ffffff; letter-spacing: 0.2px; line-height: 1.2;
-    }
-    .header .subtitle {
-      font-size: 12px; color: #bbdefb;
-    }
-    .header .devs {
-      font-size: 11px; color: #90caf9; margin-top: 2px;
-    }
-    .statusbar {
-      display: flex; align-items: center; gap: 14px;
-      padding: 7px 20px; background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      font-size: 11px; flex-wrap: wrap;
-    }
-    .status-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      display: inline-block; margin-right: 5px; vertical-align: middle;
-    }
-    .dot-on  { background: var(--good); box-shadow: 0 0 6px var(--good); }
-    .dot-off { background: #b0bec5; }
-    .dot-warn{ background: var(--warn); box-shadow: 0 0 6px var(--warn); }
-    .dot-bad { background: var(--bad);  box-shadow: 0 0 6px var(--bad); }
-    #last-update { margin-left: auto; color: var(--muted); }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 14px; padding: 14px 20px;
-    }
-    .grid-sm {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px; padding: 12px 20px;
-    }
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 12px 16px; position: relative; transition: border-color 0.3s;
-    }
-    .card.alert  { border-color: var(--bad); }
-    .card.warn   { border-color: var(--warn); }
-    .card.normal { border-color: var(--good); }
-    .card-icon {
-      font-size: 18px; margin-bottom: 4px; display: block;
-    }
-    .card-label {
-      font-size: 10px; font-weight: 600; letter-spacing: 1px;
-      text-transform: uppercase; color: var(--muted); margin-bottom: 4px;
-    }
-    .card-value {
-      font-size: 26px; font-weight: 700; line-height: 1;
-      color: var(--text); transition: color 0.3s;
-    }
-    .card-unit {
-      font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 3px;
-    }
-    .card-sub {
-      font-size: 11px; color: var(--muted); margin-top: 5px;
-    }
-    .relay-badge {
-      display: inline-block; padding: 3px 9px; border-radius: 20px;
-      font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
-    }
-    .relay-on  { background: #e8f5e9; color: var(--good); border: 1px solid var(--good); }
-    .relay-off { background: #f5f5f5; color: #78909c; border: 1px solid #b0bec5; }
-    .progress-wrap {
-      background: #e0e0e0; border-radius: 4px; height: 6px;
-      margin-top: 8px; overflow: hidden;
-    }
-    .progress-bar {
-      height: 100%; border-radius: 4px; transition: width 0.5s, background 0.5s;
-    }
-    .section-title {
-      font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
-      text-transform: uppercase; color: var(--muted);
-      padding: 4px 20px 0;
-    }
-    .chart-wrap {
-      position: relative; height: 200px; width: 100%;
-    }
-    .footer {
-      text-align: center; padding: 12px 20px;
-      font-size: 11px; color: var(--muted);
-      border-top: 1px solid var(--border); background: var(--surface);
-    }
-    @keyframes pulse {
-      0%,100% { opacity: 1; }
-      50%      { opacity: 0.6; }
-    }
-    .pulsing { animation: pulse 1.5s ease-in-out infinite; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aquaponic Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+  :root{
+    --bg:#0f172a;--surface:#1e293b;--card:#1e293b;
+    --border:#334155;--text:#f1f5f9;--muted:#94a3b8;
+    --good:#22c55e;--warn:#f59e0b;--bad:#ef4444;--accent:#3b82f6;
+    --teal:#14b8a6;--purple:#a855f7;
+    --radius:12px;--radius-sm:8px;
+  }
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    background:var(--bg);color:var(--text);
+    min-height:100vh;padding-bottom:40px;
+  }
+
+  /* ── Top bar ─────────────────────────────────────────────── */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 28px;background:#0f172a;
+    border-bottom:1px solid var(--border);flex-wrap:wrap;gap:12px;
+  }
+  .topbar .logo{
+    font-size:20px;font-weight:800;color:#fff;letter-spacing:-0.3px;
+    display:flex;align-items:center;gap:10px;
+  }
+  .topbar .logo .dot{width:10px;height:10px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);}
+  .topbar .status-row{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  .status-pill{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:12px;font-weight:500;padding:4px 12px;
+    border-radius:20px;background:rgba(255,255,255,0.05);
+    border:1px solid var(--border);
+  }
+  .status-pill .s-dot{width:6px;height:6px;border-radius:50%}
+  .s-dot.on{background:var(--good);box-shadow:0 0 4px var(--good)}
+  .s-dot.off{background:var(--muted)}
+  .s-dot.warn{background:var(--warn);box-shadow:0 0 4px var(--warn)}
+  .s-dot.bad{background:var(--bad);box-shadow:0 0 4px var(--bad)}
+  #connection-status{font-size:12px;color:var(--muted)}
+
+  /* ── Grid & cards ────────────────────────────────────────── */
+  .main-grid{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));
+    gap:16px;padding:20px 28px;
+  }
+  .card{
+    background:var(--card);border:1px solid var(--border);
+    border-radius:var(--radius);padding:20px;position:relative;
+    transition:border-color 0.3s,box-shadow 0.3s;
+  }
+  .card:hover{box-shadow:0 4px 24px rgba(0,0,0,0.3)}
+  .card.alert{border-color:var(--bad);box-shadow:0 0 0 1px rgba(239,68,68,0.15)}
+  .card.warn{border-color:var(--warn);box-shadow:0 0 0 1px rgba(245,158,11,0.15)}
+  .card-header{
+    display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;
+  }
+  .card-header .label{font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;color:var(--muted)}
+  .card-header .icon{font-size:18px}
+  .card-value{
+    font-size:30px;font-weight:700;line-height:1;color:#fff;transition:color 0.3s;
+  }
+  .card-value .unit{font-size:13px;font-weight:400;color:var(--muted);margin-left:4px}
+  .card-sub{font-size:11px;color:var(--muted);margin-top:6px}
+  .chart-wrap{position:relative;height:160px;width:100%;margin-top:12px}
+
+  /* ── Badge ────────────────────────────────────────────────── */
+  .badge{
+    display:inline-block;padding:3px 10px;border-radius:20px;
+    font-size:11px;font-weight:600;letter-spacing:0.4px;
+  }
+  .badge-on{background:rgba(34,197,94,0.12);color:var(--good);border:1px solid rgba(34,197,94,0.3)}
+  .badge-off{background:rgba(148,163,184,0.08);color:var(--muted);border:1px solid rgba(148,163,184,0.15)}
+  .badge-warn{background:rgba(245,158,11,0.12);color:var(--warn);border:1px solid rgba(245,158,11,0.3)}
+
+  /* ── Progress ─────────────────────────────────────────────── */
+  .progress-wrap{background:rgba(255,255,255,0.06);border-radius:4px;height:6px;margin-top:10px;overflow:hidden}
+  .progress-bar{height:100%;border-radius:4px;transition:width 0.5s,background 0.5s}
+
+  /* ── Section ──────────────────────────────────────────────── */
+  .section-head{
+    font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;
+    color:var(--muted);padding:24px 28px 4px;
+  }
+
+  /* ── Actuator row ─────────────────────────────────────────── */
+  .actuator-grid{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:12px;padding:4px 28px 16px;
+  }
+  .actuator-card{
+    background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);
+    padding:16px;text-align:center;
+  }
+  .actuator-card .a-label{font-size:10px;font-weight:600;letter-spacing:0.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+  .actuator-card .a-cond{font-size:10px;color:var(--muted);margin-top:6px}
+
+  /* ── GSM row ──────────────────────────────────────────────── */
+  .gsm-grid{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:12px;padding:4px 28px 16px;
+  }
+
+  /* ── Footer ───────────────────────────────────────────────── */
+  .footer{padding:16px 28px;text-align:center;font-size:11px;color:var(--muted);border-top:1px solid var(--border)}
+
+  @media(max-width:700px){
+    .main-grid{grid-template-columns:1fr;padding:12px}
+    .topbar{padding:12px 16px}
+    .card{padding:14px}
+    .card-value{font-size:24px}
+  }
+</style>
 </head>
 <body>
 
-<div class="header">
-  <div class="title">&#127754; Multi-Layer Aquaponic for Crayfish and Fish (Zebra Danios) System</div>
-  <div class="subtitle">Raspberry Pi Dashboard &mdash; Live MQTT via SSE &bull; 5-min graphs</div>
-  <div class="devs">
-    Acosta, Mark Girone C. &nbsp;|&nbsp;
-    Antoniano, Ryan Russel A. &nbsp;|&nbsp;
-    Bumatay, Axel Jillian C. &nbsp;|&nbsp;
-    Cruz, Hanna Clerdee E. &nbsp;|&nbsp;
-    Danque, John Michael G. &nbsp;|&nbsp;
-    Yebes, Kim Jensen B.
+<!-- ═══ TOP BAR ════════════════════════════════════════════════ -->
+<div class="topbar">
+  <div class="logo"><span class="dot"></span>Aquaponic Monitor</div>
+  <div class="status-row">
+    <span class="status-pill"><span class="s-dot off" id="dot-pump"></span><span id="lbl-pump">Pump</span></span>
+    <span class="status-pill"><span class="s-dot off" id="dot-uv"></span><span id="lbl-uv">UV</span></span>
+    <span class="status-pill"><span class="s-dot off" id="dot-air"></span><span id="lbl-air">Air</span></span>
+    <span class="status-pill"><span class="s-dot off" id="dot-wpump"></span><span id="lbl-wpump">Water</span></span>
+    <span class="status-pill"><span class="s-dot off" id="dot-trelay"></span><span id="lbl-trelay">Temp</span></span>
+    <span id="connection-status">● LIVE</span>
   </div>
 </div>
 
-<div class="statusbar">
-  <span><span class="status-dot dot-off" id="sb-pump-dot"></span><span id="sb-pump">Pump OFF</span></span>
-  <span><span class="status-dot dot-off" id="sb-uv-dot"></span><span id="sb-uv">UV OFF</span></span>
-  <span><span class="status-dot dot-off" id="sb-air-dot"></span><span id="sb-air">Air Relay OFF</span></span>
-  <span><span class="status-dot dot-off" id="sb-wpump-dot"></span><span id="sb-wpump">Water Pump OFF</span></span>
-  <span><span class="status-dot dot-off" id="sb-trelay-dot"></span><span id="sb-trelay">Temp Relay OFF</span></span>
-  <span id="last-update">—</span>
-</div>
+<!-- ═══ WATER QUALITY ══════════════════════════════════════════ -->
+<div class="section-head">&#x1F4A7; Water Quality</div>
+<div class="main-grid">
 
-<!-- Water Quality -->
-<div class="section-title">&#128167; Water Quality</div>
-<div class="grid">
   <div class="card" id="card-tds">
-    <span class="card-icon">&#9878;</span>
-    <div class="card-label">TDS <span style="font-weight:400" id="tds-quality"></span></div>
-    <div class="card-value" id="tds">—<span class="card-unit">ppm</span></div>
+    <div class="card-header">
+      <span class="label">TDS</span><span class="icon">&#x269B;</span>
+    </div>
+    <div class="card-value" id="tds">—<span class="unit">ppm</span></div>
+    <div class="card-sub" id="tds-quality"></div>
     <div class="chart-wrap"><canvas id="chart-tds"></canvas></div>
   </div>
+
   <div class="card" id="card-ph">
-    <span class="card-icon">&#9878;</span>
-    <div class="card-label">pH Level</div>
+    <div class="card-header">
+      <span class="label">pH Level</span><span class="icon">&#x269B;</span>
+    </div>
     <div class="card-value" id="ph">—</div>
-    <div class="chart-wrap"><canvas id="chart-ph"></canvas></div>
     <div class="card-sub" id="ph-status">—</div>
+    <div class="chart-wrap"><canvas id="chart-ph"></canvas></div>
   </div>
+
   <div class="card" id="card-temp">
-    <span class="card-icon">&#127777;&#65039;</span>
-    <div class="card-label">Water Temperature</div>
-    <div class="card-value" id="temp">—<span class="card-unit">&deg;C</span></div>
+    <div class="card-header">
+      <span class="label">Temperature</span><span class="icon">&#x1F321;</span>
+    </div>
+    <div class="card-value" id="temp">—<span class="unit">&deg;C</span></div>
     <div class="chart-wrap"><canvas id="chart-temp"></canvas></div>
     <div class="card-sub">DS18B20</div>
   </div>
+
   <div class="card" id="card-lux">
-    <span class="card-icon">&#128161;</span>
-    <div class="card-label">Light Intensity</div>
-    <div class="card-value" id="lux">—<span class="card-unit">lux</span></div>
-    <div class="chart-wrap"><canvas id="chart-lux"></canvas></div>
+    <div class="card-header">
+      <span class="label">Light Intensity</span><span class="icon">&#x1F4A1;</span>
+    </div>
+    <div class="card-value" id="lux">—<span class="unit">lux</span></div>
     <div class="card-sub" id="lux-sub">BH1750</div>
+    <div class="chart-wrap"><canvas id="chart-lux"></canvas></div>
   </div>
+
 </div>
 
-<!-- Water Level -->
-<div class="section-title">&#128704; Water Level (Ultrasonic)</div>
-<div class="grid-sm">
+<!-- ═══ WATER LEVEL ════════════════════════════════════════════ -->
+<div class="section-head">&#x1F6A7; Water Level</div>
+<div class="main-grid">
   <div class="card" id="card-sonar">
-    <span class="card-icon">&#128225;</span>
-    <div class="card-label">Distance (Sensor to Water)</div>
-    <div class="card-value" id="sonar-dist">—<span class="card-unit">cm</span></div>
+    <div class="card-header">
+      <span class="label">Distance (Sensor Surface)</span><span class="icon">&#x1F4CF;</span>
+    </div>
+    <div class="card-value" id="sonar-dist">—<span class="unit">cm</span></div>
     <div class="card-sub" id="sonar-sub">AJ-SR04M</div>
   </div>
   <div class="card" id="card-wlevel">
-    <span class="card-icon">&#128167;</span>
-    <div class="card-label">Water Level (from bottom)</div>
-    <div class="card-value" id="water-level">—<span class="card-unit">cm</span></div>
+    <div class="card-header">
+      <span class="label">Water Level (Bottom)</span><span class="icon">&#x1F4A7;</span>
+    </div>
+    <div class="card-value" id="water-level">—<span class="unit">cm</span></div>
     <div class="card-sub" id="wlevel-sub">Target: 10.0 cm</div>
-  </div>
-</div>
-<div class="grid">
-  <div class="card">
-    <div class="card-label">Water Level History</div>
     <div class="chart-wrap"><canvas id="chart-wlevel"></canvas></div>
   </div>
 </div>
 
-<!-- Air Quality -->
-<div class="section-title">&#127981; Air Quality (MQ135)</div>
-<div class="grid">
+<!-- ═══ AIR QUALITY ════════════════════════════════════════════ -->
+<div class="section-head">&#x1F32C; Air Quality (MQ135)</div>
+<div class="main-grid">
   <div class="card" id="card-aq">
-    <span class="card-icon">&#129331;</span>
-    <div class="card-label">CO&sup2; Equivalent</div>
-    <div class="card-value" id="aq-ppm">—<span class="card-unit">ppm</span></div>
-    <div class="chart-wrap"><canvas id="chart-aq"></canvas></div>
+    <div class="card-header">
+      <span class="label">CO&sup2; Equivalent</span><span class="icon">&#x1F343;</span>
+    </div>
+    <div class="card-value" id="aq-ppm">—<span class="unit">ppm</span></div>
     <div class="card-sub" id="aq-label">—</div>
+    <div class="chart-wrap"><canvas id="chart-aq"></canvas></div>
     <div class="progress-wrap">
       <div class="progress-bar" id="aq-bar" style="width:100%;background:var(--good)"></div>
     </div>
@@ -222,230 +215,232 @@
   </div>
 </div>
 
-<!-- Actuators -->
-<div class="section-title">&#9881;&#65039; Actuators</div>
-<div class="grid-sm">
-  <div class="card">
-    <span class="card-icon">&#128166;</span>
-    <div class="card-label">Flush Pump</div>
-    <div style="margin-top:6px"><span class="relay-badge relay-off" id="pump-badge">OFF</span></div>
-    <div class="card-sub" style="margin-top:8px">TDS &ge; 300 ppm</div>
+<!-- ═══ ACTUATORS ══════════════════════════════════════════════ -->
+<div class="section-head">&#x2699; Actuators</div>
+<div class="actuator-grid">
+  <div class="actuator-card">
+    <div class="a-label">Flush Pump</div>
+    <span class="badge badge-off" id="pump-badge">OFF</span>
+    <div class="a-cond">TDS &ge; 300 ppm</div>
   </div>
-  <div class="card">
-    <span class="card-icon">&#9728;&#65039;</span>
-    <div class="card-label">UV Lamp</div>
-    <div style="margin-top:6px"><span class="relay-badge relay-off" id="uv-badge">OFF</span></div>
-    <div class="card-sub" style="margin-top:8px">Lux &le; 10</div>
+  <div class="actuator-card">
+    <div class="a-label">UV Lamp</div>
+    <span class="badge badge-off" id="uv-badge">OFF</span>
+    <div class="a-cond">Lux &le; 10</div>
   </div>
-  <div class="card">
-    <span class="card-icon">&#128168;</span>
-    <div class="card-label">Air Quality Relay</div>
-    <div style="margin-top:6px"><span class="relay-badge relay-off" id="air-badge">OFF</span></div>
-    <div class="card-sub" style="margin-top:8px">CO&sup2; &ge; 1000 ppm</div>
+  <div class="actuator-card">
+    <div class="a-label">Air Relay</div>
+    <span class="badge badge-off" id="air-badge">OFF</span>
+    <div class="a-cond">CO&sup2; &ge; 1000 ppm</div>
   </div>
-  <div class="card">
-    <span class="card-icon">&#128704;</span>
-    <div class="card-label">Water Fill Pump</div>
-    <div style="margin-top:6px"><span class="relay-badge relay-off" id="wpump-badge">OFF</span></div>
-    <div class="card-sub" style="margin-top:8px">Water &lt; 10 cm</div>
+  <div class="actuator-card">
+    <div class="a-label">Water Pump</div>
+    <span class="badge badge-off" id="wpump-badge">OFF</span>
+    <div class="a-cond">Level &lt; 10 cm</div>
   </div>
-  <div class="card">
-    <span class="card-icon">&#127777;&#65039;</span>
-    <div class="card-label">Temp Control Relay</div>
-    <div style="margin-top:6px"><span class="relay-badge relay-off" id="trelay-badge">OFF</span></div>
-    <div class="card-sub" style="margin-top:8px">ON &ge; 30&deg;C / OFF &le; 28&deg;C</div>
+  <div class="actuator-card">
+    <div class="a-label">Temp Relay</div>
+    <span class="badge badge-off" id="trelay-badge">OFF</span>
+    <div class="a-cond">ON &ge; 30&deg;C / OFF &le; 28&deg;C</div>
   </div>
 </div>
 
-<!-- GSM -->
-<div class="section-title">&#128241; GSM / Alerts</div>
-<div class="grid-sm">
-  <div class="card">
-    <span class="card-icon">&#128225;</span>
-    <div class="card-label">GSM Module</div>
-    <div class="card-value" id="gsm-ready" style="font-size:16px;margin-top:4px">—</div>
+<!-- ═══ GSM ════════════════════════════════════════════════════ -->
+<div class="section-head">&#x1F4E1; Connectivity</div>
+<div class="gsm-grid">
+  <div class="actuator-card">
+    <div class="a-label">GSM Module</div>
+    <div class="card-value" id="gsm-ready" style="font-size:18px;margin-top:4px">—</div>
     <div class="card-sub" id="gsm-rssi">RSSI: —</div>
     <div class="card-sub" id="gsm-volt">Voltage: —</div>
   </div>
-  <div class="card">
-    <span class="card-icon">&#128140;</span>
-    <div class="card-label">SMS Alerts Sent</div>
-    <div class="card-value" id="sms-sent">0</div>
-    <div class="card-sub">pH out-of-range alerts</div>
+  <div class="actuator-card">
+    <div class="a-label">SMS Sent</div>
+    <div class="card-value" id="sms-sent" style="font-size:24px">0</div>
+    <div class="card-sub">pH alerts</div>
   </div>
 </div>
 
-<div class="footer">
-  Multi-Layer Aquaponic for Crayfish and Fish (Zebra Danios) System &mdash; Raspberry Pi &bull; MQTT live feed
-</div>
+<div class="footer">Aquaponic System &bull; Raspberry Pi &bull; MQTT live feed &bull; Charts: 5-min rolling window</div>
 
 <script>
-// ── Colour helpers ──────────────────────────────────────────────
-function tdsC(v)  { return v<150 ? 'var(--good)' : v<300 ? 'var(--warn)' : 'var(--bad)'; }
-function phC(v)   { return v>=6 && v<=8 ? 'var(--good)' : v>=5.5 && v<=8.5 ? 'var(--warn)' : 'var(--bad)'; }
-function tempC(v) { return v>=18 && v<=26 ? 'var(--good)' : v>=15 && v<=28 ? 'var(--warn)' : 'var(--bad)'; }
-function luxC(v)  { return v>10 ? 'var(--good)' : v>5 ? 'var(--warn)' : 'var(--bad)'; }
-function aqC(l)   { return l==='GOOD'?'var(--good)':l==='MODERATE'?'var(--teal)':l==='POOR'?'var(--warn)':l==='BAD'?'var(--bad)':'#b71c1c'; }
-function wlC(v)   { return v<0 ? 'var(--muted)' : v>=10 ? 'var(--good)' : v>=5 ? 'var(--warn)' : 'var(--bad)'; }
+// ═══════════════════════════════════════════════════════════════
+//  Helpers — return hex colours (work in DOM + Chart.js)
+// ═══════════════════════════════════════════════════════════════
+const GOOD = '#22c55e', WARN = '#f59e0b', BAD = '#ef4444',
+      TEAL = '#14b8a6', MUTED = '#94a3b8', ACCENT = '#3b82f6';
 
-// ── Chart helpers ───────────────────────────────────────────────
-const MAX_POINTS = 150; // 5 minutes at 2s interval
+const tdsC = v => v<150 ? GOOD : v<300 ? WARN : BAD;
+const phC  = v => v>=6&&v<=8 ? GOOD : v>=5.5&&v<=8.5 ? WARN : BAD;
+const tmpC = v => v>=18&&v<=26 ? GOOD : v>=15&&v<=28 ? WARN : BAD;
+const luxC = v => v>10 ? GOOD : v>5 ? WARN : BAD;
+const aqC  = l => l==='GOOD' ? GOOD : l==='MODERATE' ? TEAL : l==='POOR' ? WARN : BAD;
+const wlC  = v => v<0 ? MUTED : v>=10 ? GOOD : v>=5 ? WARN : BAD;
+
+// ═══════════════════════════════════════════════════════════════
+//  Charts — rolling 150-point buffer (5 min at 2s poll)
+// ═══════════════════════════════════════════════════════════════
+const MAX = 150;
 const charts = {};
 
-function makeChart(canvasId, label, colour, yMin, yMax) {
-  const ctx = document.getElementById(canvasId).getContext('2d');
+function makeChart(id, yMin, yMax) {
+  const ctx = document.getElementById(id).getContext('2d');
   return new Chart(ctx, {
     type: 'line',
-    data: { labels: [], datasets: [{ label, data: [],
-      borderColor: colour, backgroundColor: colour + '20',
-      borderWidth: 1.5, pointRadius: 0, tension: 0.3, fill: true }] },
+    data: { labels: [], datasets: [{
+      data: [], borderWidth: 2, pointRadius: 0,
+      tension: 0.35, fill: true, borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,0.08)'
+    }] },
     options: {
-      responsive: true, maintainAspectRatio: false,
-      animation: false,
+      responsive: true, maintainAspectRatio: false, animation: false,
+      interaction: { intersect: false, mode: 'index' },
       scales: {
         x: { display: false },
-        y: { min: yMin, max: yMax, ticks: { font: { size: 9 }, maxTicksLimit: 4 },
-             grid: { color: '#e0e0e0' } }
+        y: { min: yMin, max: yMax, ticks: { color: '#94a3b8', font: { size: 9 }, maxTicksLimit: 4 },
+             grid: { color: 'rgba(148,163,184,0.08)' } }
       },
-      plugins: { legend: { display: false } }
+      plugins: { legend: { display: false }, tooltip: { enabled: true, mode: 'index' } }
     }
   });
 }
 
-function pushChart(chart, value, colour) {
+function pushChart(chart, value, color) {
   const now = new Date().toLocaleTimeString();
   chart.data.labels.push(now);
   chart.data.datasets[0].data.push(value);
-  chart.data.datasets[0].borderColor = colour;
-  chart.data.datasets[0].backgroundColor = colour + '20';
-  while (chart.data.labels.length > MAX_POINTS) {
+  chart.data.datasets[0].borderColor = color;
+  chart.data.datasets[0].backgroundColor = color + '22';
+  while (chart.data.labels.length > MAX) {
     chart.data.labels.shift();
     chart.data.datasets[0].data.shift();
   }
   chart.update('none');
 }
 
-// ── Create charts ───────────────────────────────────────────────
-// Use transparent colours — updated on each SSE tick
-charts.tds    = makeChart('chart-tds',    'TDS',    'var(--good)', 0, 600);
-charts.ph     = makeChart('chart-ph',     'pH',     'var(--good)', 0, 14);
-charts.temp   = makeChart('chart-temp',   'Temp',   'var(--good)', 0, 50);
-charts.lux    = makeChart('chart-lux',    'Lux',    'var(--good)', 0, 100);
-charts.wlevel = makeChart('chart-wlevel', 'Water',  'var(--good)', 0, 25);
-charts.aq     = makeChart('chart-aq',     'CO\u00B2',  'var(--good)', 0, 5000);
+charts.tds    = makeChart('chart-tds',    0, 600);
+charts.ph     = makeChart('chart-ph',     0, 14);
+charts.temp   = makeChart('chart-temp',   0, 50);
+charts.lux    = makeChart('chart-lux',    0, 100);
+charts.wlevel = makeChart('chart-wlevel', 0, 25);
+charts.aq     = makeChart('chart-aq',     0, 5000);
 
-// ── SSE ─────────────────────────────────────────────────────────
-const evtSource = new EventSource('/stream');
+// ═══════════════════════════════════════════════════════════════
+//  DOM updaters
+// ═══════════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
 
-evtSource.onmessage = function(e) {
-  const d = JSON.parse(e.data);
+function setBadge(id, on) {
+  const el = $(id);
+  if (!el) return;
+  el.textContent = on ? 'ON' : 'OFF';
+  el.className = 'badge ' + (on ? 'badge-on' : 'badge-off');
+}
 
-  // ── TDS
-  const td = tdsC(d.tds);
-  document.getElementById('tds').innerHTML = d.tds.toFixed(1) + '<span class="card-unit">ppm</span>';
-  document.getElementById('tds').style.color = td;
-  document.getElementById('tds-quality').textContent = d.tds_quality ? '· ' + d.tds_quality : '';
-  document.getElementById('card-tds').className = 'card ' + (td==='var(--good)'?'normal':td==='var(--warn)'?'warn':'alert');
-  pushChart(charts.tds, d.tds, td);
+function setDot(id, state) {
+  const el = $(id); if (!el) return;
+  el.className = 's-dot ' + state;
+}
 
-  // ── pH
-  const ph = phC(d.ph);
-  document.getElementById('ph').textContent = d.ph.toFixed(2);
-  document.getElementById('ph').style.color = ph;
-  document.getElementById('ph-status').textContent = (d.ph<6||d.ph>8) ? '\u26a0\uFE0F OUT OF RANGE' : '\u2713 Normal (6.0\u20138.0)';
-  document.getElementById('ph-status').style.color = ph;
-  document.getElementById('card-ph').className = 'card ' + (ph==='var(--good)'?'normal':ph==='var(--warn)'?'warn':'alert');
-  pushChart(charts.ph, d.ph, ph);
+// ═══════════════════════════════════════════════════════════════
+//  Polling — fetch /data every 2s
+// ═══════════════════════════════════════════════════════════════
+async function fetchData() {
+  try {
+    const res = await fetch('/data');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const d = await res.json();
 
-  // ── Temp
-  const tc = tempC(d.temp);
-  document.getElementById('temp').innerHTML = d.temp.toFixed(2) + '<span class="card-unit">&deg;C</span>';
-  document.getElementById('temp').style.color = tc;
-  document.getElementById('card-temp').className = 'card ' + (tc==='var(--good)'?'normal':tc==='var(--warn)'?'warn':'alert');
-  pushChart(charts.temp, d.temp, tc);
+    // Water quality
+    const cTds = tdsC(d.tds);
+    $('tds').innerHTML = (d.tds??0).toFixed(1) + '<span class="unit">ppm</span>';
+    $('tds').style.color = cTds;
+    $('tds-quality').textContent = d.tds_quality || '';
+    $('tds-quality').style.color = cTds;
+    $('card-tds').className = 'card' + (cTds===GOOD?'':cTds===WARN?' warn':' alert');
+    pushChart(charts.tds, d.tds??0, cTds);
 
-  // ── Lux
-  const lc = luxC(d.lux);
-  document.getElementById('lux').innerHTML = d.lux.toFixed(1) + '<span class="card-unit">lux</span>';
-  document.getElementById('lux').style.color = lc;
-  document.getElementById('lux-sub').textContent = d.lux<=10 ? '\u26a0\uFE0F Low light \u2014 UV ON' : '\u2713 Sufficient light';
-  document.getElementById('lux-sub').style.color = lc;
-  document.getElementById('card-lux').className = 'card ' + (lc==='var(--good)'?'normal':lc==='var(--warn)'?'warn':'alert');
-  pushChart(charts.lux, d.lux, lc);
+    const cPh = phC(d.ph);
+    $('ph').textContent = (d.ph??7).toFixed(2);
+    $('ph').style.color = cPh;
+    $('ph-status').textContent = ((d.ph??7)<6||(d.ph??7)>8) ? '⚠ OUT OF RANGE' : '✓ Normal (6.0–8.0)';
+    $('ph-status').style.color = cPh;
+    $('card-ph').className = 'card' + (cPh===GOOD?'':cPh===WARN?' warn':' alert');
+    pushChart(charts.ph, d.ph??7, cPh);
 
-  // ── Water level
-  const wc = wlC(d.water_level);
-  const sdEl = document.getElementById('sonar-dist');
-  sdEl.innerHTML = d.sonar_dist>=0 ? d.sonar_dist.toFixed(2) + '<span class="card-unit">cm</span>' : '—';
-  sdEl.style.color = d.sonar_dist>=0 ? wc : 'var(--muted)';
-  document.getElementById('sonar-sub').textContent = d.sonar_dist<0 ? '\u26a0\uFE0F No echo' : '\u2713 Detected';
-  const wlEl = document.getElementById('water-level');
-  wlEl.innerHTML = d.water_level>=0 ? d.water_level.toFixed(2) + '<span class="card-unit">cm</span>' : '—';
-  wlEl.style.color = wc;
-  document.getElementById('wlevel-sub').textContent = d.water_level>=0 ? 'Target: 10.0 cm ' + (d.water_level>=10 ? '\u2713 OK' : '\u26a0\uFE0F Low') : 'Sensor error';
-  document.getElementById('wlevel-sub').style.color = wc;
-  document.getElementById('card-wlevel').className = 'card ' + (wc==='var(--good)'?'normal':wc==='var(--warn)'?'warn':wc==='var(--muted)'?'':'alert');
-  if (d.water_level >= 0) pushChart(charts.wlevel, d.water_level, wc);
+    const cTmp = tmpC(d.temp);
+    $('temp').innerHTML = (d.temp??25).toFixed(2) + '<span class="unit">&deg;C</span>';
+    $('temp').style.color = cTmp;
+    $('card-temp').className = 'card' + (cTmp===GOOD?'':cTmp===WARN?' warn':' alert');
+    pushChart(charts.temp, d.temp??25, cTmp);
 
-  // ── Air quality
-  const ac = aqC(d.aq_label);
-  document.getElementById('aq-ppm').innerHTML = d.aq_ppm.toFixed(1) + '<span class="card-unit">ppm</span>';
-  document.getElementById('aq-ppm').style.color = ac;
-  document.getElementById('aq-label').textContent = d.aq_label;
-  document.getElementById('aq-label').style.color = ac;
-  document.getElementById('aq-pct').textContent = 'Air quality: ' + d.aq_pct.toFixed(1) + '%';
-  const bar = document.getElementById('aq-bar');
-  bar.style.width = d.aq_pct.toFixed(1) + '%';
-  bar.style.background = ac;
-  document.getElementById('card-aq').className = 'card ' + (d.aq_ppm<400?'normal':d.aq_ppm<1000?'warn':'alert');
-  pushChart(charts.aq, d.aq_ppm, ac);
+    const cLux = luxC(d.lux);
+    $('lux').innerHTML = (d.lux??0).toFixed(1) + '<span class="unit">lux</span>';
+    $('lux').style.color = cLux;
+    $('lux-sub').textContent = (d.lux??0)<=10 ? '⚠ Low — UV ON' : '✓ Sufficient';
+    $('lux-sub').style.color = cLux;
+    $('card-lux').className = 'card' + (cLux===GOOD?'':cLux===WARN?' warn':' alert');
+    pushChart(charts.lux, d.lux??0, cLux);
 
-  // ── Relays
-  function setRelay(id, on) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.textContent = on ? 'ON' : 'OFF';
-    el.className = 'relay-badge ' + (on ? 'relay-on pulsing' : 'relay-off');
+    // Water level
+    const cWl = wlC(d.water_level);
+    const sd = d.sonar_dist??0;
+    $('sonar-dist').innerHTML = sd>=0 ? sd.toFixed(2) + '<span class="unit">cm</span>' : '—<span class="unit">cm</span>';
+    $('sonar-dist').style.color = sd>=0 ? cWl : MUTED;
+    $('sonar-sub').textContent = sd<0 ? '⚠ No echo' : '✓ Detected';
+    $('sonar-sub').style.color = sd<0 ? BAD : GOOD;
+    const wl = d.water_level??0;
+    $('water-level').innerHTML = wl>=0 ? wl.toFixed(2) + '<span class="unit">cm</span>' : '—<span class="unit">cm</span>';
+    $('water-level').style.color = cWl;
+    $('wlevel-sub').textContent = wl>=0 ? 'Target: 10.0 cm ' + (wl>=10?'✓ OK':'⚠ Low') : 'Sensor error';
+    $('wlevel-sub').style.color = cWl;
+    $('card-wlevel').className = 'card' + (cWl===GOOD?'':cWl===WARN?' warn':cWl===BAD?' alert':'');
+    if (wl >= 0) pushChart(charts.wlevel, wl, cWl);
+
+    // Air quality
+    const cAq = aqC(d.aq_label);
+    $('aq-ppm').innerHTML = (d.aq_ppm??400).toFixed(1) + '<span class="unit">ppm</span>';
+    $('aq-ppm').style.color = cAq;
+    $('aq-label').textContent = d.aq_label || '';
+    $('aq-label').style.color = cAq;
+    $('aq-pct').textContent = 'Air quality: ' + (d.aq_pct??100).toFixed(1) + '%';
+    $('aq-bar').style.width = (d.aq_pct??100).toFixed(1) + '%';
+    $('aq-bar').style.background = cAq;
+    $('card-aq').className = 'card' + ((d.aq_ppm??400)<400?'':(d.aq_ppm??400)<1000?' warn':' alert');
+    pushChart(charts.aq, d.aq_ppm??400, cAq);
+
+    // Relays
+    setBadge('pump-badge', d.pump);
+    setBadge('uv-badge', d.uv);
+    setBadge('air-badge', d.air_relay);
+    setBadge('wpump-badge', d.water_pump);
+    setBadge('trelay-badge', d.temp_relay);
+
+    setDot('dot-pump', d.pump?'on':'off');
+    setDot('dot-uv', d.uv?'warn':'off');
+    setDot('dot-air', d.air_relay?'bad':'off');
+    setDot('dot-wpump', d.water_pump?'warn':'off');
+    setDot('dot-trelay', d.temp_relay?'warn':'off');
+
+    // GSM
+    $('gsm-ready').textContent = d.gsm_ready ? '✓ Ready' : '✗ Offline';
+    $('gsm-ready').style.color = d.gsm_ready ? GOOD : BAD;
+    $('gsm-rssi').textContent = 'RSSI: ' + (d.rssi||0) + (d.rssi<=9?' ⚠ Weak':'');
+    $('gsm-volt').textContent = 'Voltage: ' + (d.gsm_volt ? (d.gsm_volt/1000).toFixed(2) + ' V' : '—');
+    $('sms-sent').textContent = d.sms_sent;
+
+    $('connection-status').innerHTML = '● LIVE';
+    $('connection-status').style.color = GOOD;
+
+  } catch(e) {
+    $('connection-status').innerHTML = '● OFFLINE';
+    $('connection-status').style.color = BAD;
+    console.warn('Fetch:', e.message);
   }
-  function setDot(id, state) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.className = 'status-dot dot-' + state;
-  }
-  setRelay('pump-badge',  d.pump);
-  setRelay('uv-badge',    d.uv);
-  setRelay('air-badge',   d.air_relay);
-  setRelay('wpump-badge', d.water_pump);
-  setRelay('trelay-badge',d.temp_relay);
+}
 
-  setDot('sb-pump-dot',   d.pump       ? 'on'   : 'off');
-  setDot('sb-uv-dot',     d.uv         ? 'warn' : 'off');
-  setDot('sb-air-dot',    d.air_relay  ? 'bad'  : 'off');
-  setDot('sb-wpump-dot',  d.water_pump ? 'warn' : 'off');
-  setDot('sb-trelay-dot', d.temp_relay ? 'warn' : 'off');
-
-  document.getElementById('sb-pump').textContent   = 'Pump '       + (d.pump       ? 'ON' : 'OFF');
-  document.getElementById('sb-uv').textContent     = 'UV '         + (d.uv         ? 'ON' : 'OFF');
-  document.getElementById('sb-air').textContent    = 'Air Relay '  + (d.air_relay  ? 'ON' : 'OFF');
-  document.getElementById('sb-wpump').textContent  = 'Water Pump ' + (d.water_pump ? 'ON' : 'OFF');
-  document.getElementById('sb-trelay').textContent = 'Temp Relay ' + (d.temp_relay ? 'ON' : 'OFF');
-
-  // ── GSM
-  const gs = document.getElementById('gsm-ready');
-  gs.textContent = d.gsm_ready ? '\u2705 Ready' : '\u274C Not Ready';
-  gs.style.color = d.gsm_ready ? 'var(--good)' : 'var(--bad)';
-  document.getElementById('gsm-rssi').textContent = 'RSSI: ' + (d.rssi||0)
-    + (d.rssi<=9 ? ' \u26a0\uFE0F Weak' : d.rssi<=14 ? ' \u2014 Fair' : ' \u2014 OK');
-  document.getElementById('gsm-volt').textContent = 'Voltage: '
-    + (d.gsm_volt ? (d.gsm_volt/1000).toFixed(2) + ' V' : '—');
-  document.getElementById('sms-sent').textContent = d.sms_sent;
-
-  document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
-};
-
-evtSource.onerror = function() {
-  document.getElementById('last-update').textContent = '\u26a0\uFE0F Connection lost — reconnecting...';
-};
+fetchData();
+setInterval(fetchData, 2000);
 </script>
 </body>
 </html>

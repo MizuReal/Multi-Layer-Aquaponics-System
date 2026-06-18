@@ -58,7 +58,7 @@
 #include <PubSubClient.h>
 
 // ── WiFi credentials ─────────────────────────────────────────────
-#define WIFI_SSID  "sap2ns"
+#define WIFI_SSID  "danque"
 #define WIFI_PASS  "sap2ns3a"
 
 // ── Pin definitions ──────────────────────────────────────────────
@@ -122,7 +122,7 @@ static const float MQ135_PARB    = 2.862f;    // CO₂ curve coefficient B
 const char RECIPIENT[]  = "+639685980307";
 
 // ── MQTT config ───────────────────────────────────────────────────
-#define MQTT_BROKER      "192.168.1.100"  // Raspberry Pi IP — update
+#define MQTT_BROKER      "10.174.77.5"  // Raspberry Pi IP — update
 #define MQTT_PORT         1883
 #define MQTT_CLIENT_ID    "ESP32_Aquaponic"
 #define MQTT_TOPIC_DATA   "aquaponic/data"
@@ -159,7 +159,6 @@ float phValue       = 7.0f;
 float lastLux       = 0.0f;
 bool  pumpOn        = false;   // flush pump
 bool  uvOn          = false;
-bool  bh1750Ok      = false;   // set by begin() in setup
 
 // ── MQ135 air quality state ──────────────────────────────────────
 float aqPPM         = 400.0f;
@@ -1096,7 +1095,7 @@ void setup() {
 
   // I²C + BH1750
   Wire.begin(21, 22);
-  bh1750Ok = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
+  lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
 
   // DS18B20 — async mode (non-blocking)
   tempSensor.begin();
@@ -1183,7 +1182,7 @@ void loop() {
   // ── Timer 3 · BH1750 lux + UV control (1200 ms) ──────────────
   if (now - tLux >= 1200) {
     tLux  = now;
-    lastLux = bh1750Ok ? lightMeter.readLightLevel() : 0.0f;
+    lastLux = lightMeter.readLightLevel();
     setUV(lastLux <= LUX_THRESH);
   }
 
