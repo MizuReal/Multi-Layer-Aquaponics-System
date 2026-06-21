@@ -11,9 +11,9 @@ import subprocess
 import threading
 
 import paho.mqtt.client as mqtt
-from flask import Flask, Response, render_template, jsonify
+from flask import Flask, Response, render_template, jsonify, request, send_file
 
-from classifier import get_counts, start_classifier
+from classifier import get_counts, start_classifier, classify, CLASSES, apply_overlay
 
 # ── Configuration ─────────────────────────────────────────────────
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
@@ -45,12 +45,53 @@ def data():
 def fish_count():
     return jsonify(get_counts())
 
+@app.route("/classify", methods=["POST"])
+def classify_upload():
+    file = request.files.get("image")
+    if not file or file.filename == "":
+        return jsonify({"error": "No image uploaded"}), 400
+    path = "/tmp/aquaponic_upload.jpg"
+    file.save(path)
+    predictions, raw = classify(path)
+    os.remove(path)
+    print(f"[classify_upload] raw API response keys: {list(raw.keys()) if raw else 'empty'}")
+
+    counts = {c: 0 for c in CLASSES}
+    for pred in predictions:
+        cls = pred.get("class", "")
+        if cls in counts:
+            counts[cls] += 1
+    counts["total"] = sum(counts.values())
+
+    return jsonify({
+        "counts": counts,
+        "predictions": predictions,
+        "debug": {
+            "model": "YOLOv11-nano (local)",
+            "classes": CLASSES,
+            "pred_count": len(predictions),
+            "raw_status": raw.get("status", raw.get("error", "unknown"))
+        }
+    })
+
+@app.route("/annotated")
+def annotated():
+    path = "/tmp/aquaponic_annotated.jpg"
+    if os.path.exists(path):
+        return send_file(path, mimetype="image/jpeg", max_age=1)
+    return "", 404
+
 # ── Live MJPEG video (hardware-encoded, ~5% CPU) ──────────────────
 def _video_generator():
     try:
         proc = subprocess.Popen(
             ["rpicam-vid", "-t", "0", "--codec", "mjpeg",
              "--width", "640", "--height", "480", "--framerate", "10",
+             "--awb", "auto",
+             "--saturation", "1.5",    # boost colour to match phone camera
+             "--contrast", "1.2",
+             "--sharpness", "1.2",
+             "--ev", "0.2",            # slightly brighter
              "-o", "-", "-n"],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0
         )
@@ -85,9 +126,12 @@ def _video_generator():
                     f.write(frame)
                 os.replace(tmp, LATEST_FRAME)
 
+                # Apply bounding box overlay (if predictions exist)
+                display = apply_overlay(frame)
+
                 yield (b"--frame\r\n"
                        b"Content-Type: image/jpeg\r\n\r\n" +
-                       frame + b"\r\n")
+                       display + b"\r\n")
     finally:
         proc.terminate()
         try:

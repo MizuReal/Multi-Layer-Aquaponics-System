@@ -262,24 +262,32 @@
 </div>
 
 <!-- ═══ CAMERA ════════════════════════════════════════════════ -->
-<div class="section-head">&#x1F4F7; Tank Camera (refreshes with classification)</div>
+<div class="section-head">&#x1F4F7; Tank Camera</div>
 <div class="main-grid">
   <div class="card" style="padding:12px;text-align:center">
+    <div class="card-label" style="margin-bottom:6px">Live View</div>
     <img id="camera-img" src="/video" style="width:100%;max-width:640px;border-radius:8px;border:1px solid var(--border)" alt="Live video">
-    <div class="card-sub" id="camera-sub" style="margin-top:8px">Live — 10 FPS MJPEG (hardware encoded)</div>
+    <div class="card-sub" style="margin-top:8px">10 FPS MJPEG (hardware)</div>
+  </div>
+  <div class="card" style="padding:12px;text-align:center">
+    <div class="card-label" style="margin-bottom:6px">Detections (NCNN)</div>
+    <img id="annotated-img" src="/annotated" style="width:100%;max-width:640px;border-radius:8px;border:1px solid var(--border)" alt="Annotated">
+    <div class="card-sub" id="annotated-sub" style="margin-top:8px">Refreshes every 5s</div>
+  </div>
+</div>
   </div>
 </div>
 
 <!-- ═══ SPECIES DETECTION ═══════════════════════════════════════ -->
-<div class="section-head">&#x1F41F; Species Detection (YOLO — every 30s)</div>
+<div class="section-head">&#x1F41F; Species Detection (every 5s)</div>
 <div class="gsm-grid">
   <div class="actuator-card">
     <div class="a-label">black_fish</div>
     <div class="card-value" id="count-black_fish" style="font-size:28px">—</div>
   </div>
   <div class="actuator-card">
-    <div class="a-label">Fishes</div>
-    <div class="card-value" id="count-Fishes" style="font-size:28px">—</div>
+    <div class="a-label">yellow_fish</div>
+    <div class="card-value" id="count-yellow_fish" style="font-size:28px">—</div>
   </div>
   <div class="actuator-card">
     <div class="a-label">pink_fish</div>
@@ -288,6 +296,25 @@
   <div class="actuator-card" style="border-color: var(--accent)">
     <div class="a-label">Total Fish</div>
     <div class="card-value" id="count-total" style="font-size:36px;color:var(--accent)">—</div>
+  </div>
+</div>
+
+<!-- ═══ INFERENCE TEST ══════════════════════════════════════════ -->
+<div class="section-head">&#x1F9EA; Inference Test (Manual Upload)</div>
+<div class="main-grid">
+  <div class="card" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+    <div style="flex:1;min-width:220px">
+      <input type="file" id="upload-input" accept="image/*,.jpg,.jpeg,.png" style="color:var(--muted);margin-bottom:10px;width:100%">
+      <button id="classify-btn" onclick="runClassify()" style="background:var(--accent);color:#fff;border:none;padding:8px 20px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Classify Image</button>
+      <span id="classify-status" style="font-size:11px;color:var(--muted);margin-left:10px"></span>
+      <div id="classify-results" style="margin-top:12px;font-size:13px;color:var(--text)"></div>
+      <details style="margin-top:8px"><summary style="font-size:11px;color:var(--muted);cursor:pointer">Raw Predictions</summary>
+        <pre id="classify-raw" style="font-size:10px;color:var(--muted);max-height:200px;overflow:auto;margin-top:4px;white-space:pre-wrap"></pre>
+      </details>
+    </div>
+    <div style="flex:1;min-width:200px;text-align:center">
+      <img id="upload-preview" style="max-width:100%;max-height:240px;border-radius:8px;border:1px solid var(--border);display:none" alt="Preview">
+    </div>
   </div>
 </div>
 
@@ -473,21 +500,80 @@ fetchData();
 setInterval(fetchData, 2000);
 
 // ═══════════════════════════════════════════════════════════════
-//  Fish count polling — every 30s (Roboflow free-tier safe)
+//  Fish count polling — every 5s (local YOLOv11)
 // ═══════════════════════════════════════════════════════════════
 async function fetchCounts() {
   try {
     const res = await fetch('/count');
     if (!res.ok) return;
     const c = await res.json();
-    $('count-black_fish').textContent = c.black_fish ?? '—';
-    $('count-Fishes').textContent     = c.Fishes     ?? '—';
-    $('count-pink_fish').textContent  = c.pink_fish  ?? '—';
+    $('count-black_fish').textContent  = c.black_fish  ?? '—';
+    $('count-yellow_fish').textContent = c.yellow_fish ?? '—';
+    $('count-pink_fish').textContent   = c.pink_fish   ?? '—';
     $('count-total').textContent      = c.total      ?? '—';
   } catch(e) { /* silently retry next poll */ }
 }
-setInterval(fetchCounts, 30000);
+setInterval(fetchCounts, 5000);
 fetchCounts();
+
+// ═══════════════════════════════════════════════════════════════
+//  Manual image upload → classify
+// ═══════════════════════════════════════════════════════════════
+$('upload-input').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  const preview = $('upload-preview');
+  preview.src = URL.createObjectURL(file);
+  preview.style.display = 'block';
+  $('classify-results').innerHTML = '';
+  $('classify-raw').textContent = '';
+  $('classify-status').textContent = '';
+});
+
+async function runClassify() {
+  const file = $('upload-input').files[0];
+  if (!file) { $('classify-status').textContent = 'Select an image first'; return; }
+
+  const btn = $('classify-btn');
+  btn.disabled = true;
+  btn.textContent = 'Classifying...';
+  $('classify-status').textContent = '';
+
+  try {
+    const fd = new FormData();
+    fd.append('image', file);
+    const res = await fetch('/classify', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (data.error) {
+      $('classify-status').textContent = data.error;
+      $('classify-status').style.color = BAD;
+    } else {
+      const c = data.counts;
+      $('classify-results').innerHTML =
+        '<span style="color:' + ACCENT + '">black_fish:</span> ' + (c.black_fish??0) +
+        ' &nbsp; <span style="color:' + TEAL + '">yellow_fish:</span> ' + (c.yellow_fish??0) +
+        ' &nbsp; <span style="color:' + WARN + '">pink_fish:</span> ' + (c.pink_fish??0) +
+        ' &nbsp; <b>Total: ' + (c.total??0) + '</b>';
+      $('classify-raw').textContent =
+        '=== Predictions ===\n' + JSON.stringify(data.predictions, null, 2) +
+        '\n\n=== Debug ===\n' + JSON.stringify(data.debug, null, 2);
+      $('classify-status').textContent = 'Done';
+      $('classify-status').style.color = GOOD;
+    }
+  } catch(e) {
+    $('classify-status').textContent = 'Error: ' + e.message;
+    $('classify-status').style.color = BAD;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Classify Image';
+  }
+}
+
+// Annotated frame refresh (syncs with NCNN classification cycle)
+setInterval(function() {
+  const img = document.getElementById('annotated-img');
+  if (img) img.src = '/annotated?t=' + Date.now();
+}, 5000);
 </script>
 </body>
 </html>
