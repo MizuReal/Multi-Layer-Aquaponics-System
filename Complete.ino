@@ -54,8 +54,6 @@
 #include <DallasTemperature.h>
 #include <HardwareSerial.h>
 #include <math.h>
-#define MQTT_MAX_PACKET_SIZE 1024  // Must precede PubSubClient.h
-#include <PubSubClient.h>
 
 // ── WiFi credentials ─────────────────────────────────────────────
 #define WIFI_SSID  "danque"
@@ -119,15 +117,7 @@ static const float MQ135_PARB    = 2.862f;    // CO₂ curve coefficient B
 #define GSM_TX          16          // ESP32 TX → SIM800L RXD
 #define GSM_RX          17          // ESP32 RX ← SIM800L TXD
 #define ALERT_INTERVAL  (10UL * 60UL * 1000UL)   // 10 min between alerts
-const char RECIPIENT[]  = "+639685980307";
-
-// ── MQTT config ───────────────────────────────────────────────────
-#define MQTT_BROKER      "10.92.28.5"  // Raspberry Pi IP — update
-#define MQTT_PORT         1883
-#define MQTT_CLIENT_ID    "ESP32_Aquaponic"
-#define MQTT_TOPIC_DATA   "aquaponic/data"
-#define MQTT_TOPIC_STATUS "aquaponic/status"
-#define MQTT_PUB_INTERVAL 2000          // ms (matches dashboard refresh)
+const char RECIPIENT[]  = "+639945949061";
 
 // ── Ultrasonic config ────────────────────────────────────────────
 // AJ-SR04M sensor with voltage divider on ECHO line
@@ -145,8 +135,6 @@ BH1750             lightMeter;
 OneWire            oneWire(ONE_WIRE_BUS);
 DallasTemperature  tempSensor(&oneWire);
 AsyncWebServer     server(80);
-WiFiClient         mqttWiFiClient;
-PubSubClient       mqttClient(mqttWiFiClient);
 
 // ── Water sensor state ───────────────────────────────────────────
 int   tdsBuffer[TDS_SAMPLES];
@@ -159,7 +147,6 @@ float phValue       = 7.0f;
 float lastLux       = 0.0f;
 bool  pumpOn        = false;   // flush pump
 bool  uvOn          = false;
-bool  bh1750Ok      = false;   // set by begin() in setup
 
 // ── MQ135 air quality state ──────────────────────────────────────
 float aqPPM         = 400.0f;
@@ -244,55 +231,27 @@ void setTempRelay(bool on) {
 
 // ════════════════════════════════════════════════════════════════
 //  MQ135 — compute air quality from ADC reading
-//  Phase 1: math guards prevent overflow (vAO clamp, Rs/ratio caps)
-//  Phase 2: median filter rejects ADC spikes (replaces averaging)
 // ════════════════════════════════════════════════════════════════
 
-// Bubble-sort for small burst; callable before medianOf (which works on int*)
-static float medianOfFloat(float* buf, int size) {
-  float tmp[MQ135_SAMPLES];
-  memcpy(tmp, buf, size * sizeof(float));
-  for (int i = 0; i < size - 1; i++)
-    for (int j = 0; j < size - i - 1; j++)
-      if (tmp[j] > tmp[j+1]) { float t = tmp[j]; tmp[j] = tmp[j+1]; tmp[j+1] = t; }
-  return tmp[size / 2];
-}
-
 void computeMQ135() {
-  // ── Phase 2: burst-sample → median (rejects spikes) ─────────
-  float rawSamples[MQ135_SAMPLES];
+  int raw = 0;
   for (int i = 0; i < MQ135_SAMPLES; i++) {
-    rawSamples[i] = (float)analogRead(MQ135_PIN);
+    raw += analogRead(MQ135_PIN);
     delay(5);
   }
-  float raw = medianOfFloat(rawSamples, MQ135_SAMPLES);
+  raw /= MQ135_SAMPLES;
 
   float vADC = (raw / 4095.0f) * 3.3f;
   float vAO  = vADC * (MQ135_R1 + MQ135_R2) / MQ135_R2;
 
-  // ── Phase 1: clamp vAO — it physically cannot exceed sensor VCC ─
-  if (vAO > MQ135_VCC) vAO = MQ135_VCC;
-
-  // Guard: open circuit / dead sensor
-  if (vAO < 0.01f) return;
+  if (vADC < 0.01f) return;
 
   float Rs    = ((MQ135_VCC - vAO) / vAO) * MQ135_R2;
-
-  // ── Phase 1: minimum Rs prevents ratio→0 → pow(0,−b)=∞ ─────
-  if (Rs < 1.0f)   Rs = 1.0f;
-  if (Rs > 1e6f)   Rs = 1e6f;
+  if (Rs < 0.0f) Rs = 0.0f;
 
   float ratio = Rs / MQ135_RO;
-
-  // ── Phase 1: clamp ratio bounds the power-law domain ─────────
-  if (ratio < 0.001f)  ratio = 0.001f;
-  if (ratio > 1000.0f) ratio = 1000.0f;
-
-  aqPPM = MQ135_PARA * pow(ratio, -MQ135_PARB);
-
-  // ── Phase 1: cap result to sane range ────────────────────────
-  if (aqPPM < 0.0f)      aqPPM = 0.0f;
-  if (aqPPM > 10000.0f)  aqPPM = 10000.0f;
+  aqPPM       = MQ135_PARA * pow(ratio, -MQ135_PARB);
+  if (aqPPM < 0.0f) aqPPM = 0.0f;
 
   aqPercent = constrain(
     (1.0f - (aqPPM - AQ_GOOD) / (AQ_BAD - AQ_GOOD)) * 100.0f,
@@ -494,17 +453,18 @@ void sendSMS(float ph) {
 }
 
 // ════════════════════════════════════════════════════════════════
-//  MQTT — JSON builder + broker connection
+//  WebServer — JSON data endpoint + dashboard
 // ════════════════════════════════════════════════════════════════
 
-void buildSensorJSON(char* buf, size_t bufSize) {
+void handleData(AsyncWebServerRequest* req) {
   const char* tdsQ =
     tdsValue < 50  ? "Excellent" :
     tdsValue < 150 ? "Good"      :
     tdsValue < 300 ? "Fair"      :
     tdsValue < 600 ? "Poor"      : "Bad";
 
-  snprintf(buf, bufSize,
+  char buf[768];
+  int n = snprintf(buf, sizeof(buf),
     "{"
       "\"tds\":%.1f,"
       "\"ph\":%.2f,"
@@ -542,23 +502,12 @@ void buildSensorJSON(char* buf, size_t bufSize) {
     waterPumpOn ? "true" : "false",
     gsmVoltage
   );
-}
-
-bool connectMQTT() {
-  if (mqttClient.connect(MQTT_CLIENT_ID, MQTT_TOPIC_STATUS, 0, true, "offline")) {
-    mqttClient.publish(MQTT_TOPIC_STATUS, "online", true);
-    return true;
+  // Guard: ensure null-terminated and valid JSON
+  buf[sizeof(buf) - 1] = '\0';
+  if (n < 0) {
+    req->send(500, "application/json", "{\"error\":\"json buffer overflow\"}");
+    return;
   }
-  return false;
-}
-
-// ════════════════════════════════════════════════════════════════
-//  WebServer — HTTP handlers (dashboard + JSON endpoint)
-// ════════════════════════════════════════════════════════════════
-
-void handleData(AsyncWebServerRequest* req) {
-  char buf[768];
-  buildSensorJSON(buf, sizeof(buf));
   req->send(200, "application/json", buf);
 }
 
@@ -1097,7 +1046,7 @@ void setup() {
   // I²C + BH1750
   Wire.begin(21, 22);
   Wire.setClock(50000);   // 50 kHz — stable with long jumper wires
-  bh1750Ok = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23);
+  lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, 0x23);
 
   // DS18B20 — async mode (non-blocking)
   tempSensor.begin();
@@ -1137,12 +1086,6 @@ void setup() {
   server.on("/",     HTTP_GET, handleRoot);
   server.on("/data", HTTP_GET, handleData);
   server.begin();
-
-  mqttClient.setServer(MQTT_BROKER, MQTT_PORT);
-  if (connectMQTT())
-    Serial.println("MQTT: connected to broker");
-  else
-    Serial.println("MQTT: FAILED to connect to broker — check IP/port");
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1157,13 +1100,11 @@ void setup() {
 //     5    1000 ms   pH ADC read, GSM alert check
 //     6    5000 ms   MQ135 air quality read, air relay
 //     7    2000 ms   Ultrasonic water level, water fill pump relay
-//     8    2000 ms   MQTT publish sensor data to broker
 // ════════════════════════════════════════════════════════════════
 
 void loop() {
-  mqttClient.loop();   // keepalive (non-blocking)
   static unsigned long tSample = 0, tTDS = 0, tLux = 0,
-                       tTemp   = 0, tPH  = 0, tAQ  = 0, tSonar = 0, tMQTT = 0;
+                       tTemp   = 0, tPH  = 0, tAQ  = 0, tSonar = 0;
   unsigned long now = millis();
 
   // ── Timer 1 · TDS sample (40 ms) ─────────────────────────────
@@ -1249,44 +1190,6 @@ void loop() {
       waterLevelCm = SENSOR_HEIGHT_CM - sonarDistance;
       if (waterLevelCm < 0) waterLevelCm = 0;
       setWaterPump(waterLevelCm < TARGET_LEVEL_CM);
-    }
-  }
-
-  // ── Timer 8 · MQTT publish (2000 ms) ─────────────────────────
-  if (now - tMQTT >= MQTT_PUB_INTERVAL) {
-    tMQTT = now;
-    static bool lastConn = false;
-    if (!mqttClient.connected()) {
-      connectMQTT();
-      if (lastConn) { Serial.println("MQTT: connection lost — reconnecting"); lastConn = false; }
-    }
-    if (mqttClient.connected()) {
-      if (!lastConn) { Serial.println("MQTT: reconnected OK"); lastConn = true; }
-      char buf[768];
-      buildSensorJSON(buf, sizeof(buf));
-      size_t len = strlen(buf);
-
-      if (mqttClient.beginPublish(MQTT_TOPIC_DATA, len, true)) {
-        // Chunked write — ESP32 WiFiClient can fail on >128 byte single write
-        const size_t CHUNK = 128;
-        size_t written = 0;
-        bool ok = true;
-        while (written < len && ok) {
-          size_t toWrite = (len - written) < CHUNK ? (len - written) : CHUNK;
-          size_t n = mqttClient.write((const uint8_t*)(buf + written), toWrite);
-          if (n == 0) ok = false;
-          else written += n;
-        }
-        mqttClient.endPublish();
-        if (ok) {
-          static bool firstPub = true;
-          if (firstPub) { Serial.printf("MQTT: published OK (%d bytes)\n", len); firstPub = false; }
-        } else {
-          Serial.printf("MQTT: publish FAILED after %d/%d bytes\n", written, len);
-        }
-      } else {
-        Serial.printf("MQTT: beginPublish FAILED (len=%d)\n", len);
-      }
     }
   }
 }
