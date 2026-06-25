@@ -169,6 +169,32 @@ def mqtt_loop():
     client.connect_async(MQTT_BROKER, MQTT_PORT, keepalive=60)
     client.loop_forever()
 
+def mqtt_publish(topic, msg):
+    """Publish a command to MQTT broker (short-lived client)."""
+    try:
+        c = mqtt.Client(client_id="aquaponic_cmd")
+        c.connect(MQTT_BROKER, MQTT_PORT, keepalive=10)
+        c.publish(topic, msg)
+        c.disconnect()
+    except Exception as e:
+        print(f"[mqtt] publish error: {e}")
+
+# ── Relay control routes ────────────────────────────────────────
+@app.route("/api/uv/on", methods=["POST"])
+def uv_on():
+    mqtt_publish("aquaponic/cmd/uv", "on")
+    return jsonify({"uv_override": "on"})
+
+@app.route("/api/uv/off", methods=["POST"])
+def uv_off():
+    mqtt_publish("aquaponic/cmd/uv", "off")
+    return jsonify({"uv_override": "off"})
+
+@app.route("/api/uv/auto", methods=["POST"])
+def uv_auto():
+    mqtt_publish("aquaponic/cmd/uv", "auto")
+    return jsonify({"uv_override": "auto"})
+
 # ── Main ──────────────────────────────────────────────────────────
 if __name__ == "__main__":
     threading.Thread(target=mqtt_loop, daemon=True).start()

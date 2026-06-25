@@ -45,6 +45,14 @@ void setup() {
   Serial.println(F("[2] Testing BH1750 addresses ..."));
   testAddress(I2C_ADDR_DEFAULT, "0x23 (ADDR=GND / floating)");
   testAddress(I2C_ADDR_ALT,     "0x5C (ADDR=VCC, typical GY-302)");
+
+  // Set CONTINUOUS mode for loop readings
+  if (lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE, I2C_ADDR_DEFAULT)) {
+    Serial.println(F("  Loop init (CONTINUOUS) → OK ✓"));
+  } else {
+    Serial.println(F("  Loop init (CONTINUOUS) → FAIL ✗"));
+  }
+
   Serial.println(F("──────────────────────────────────────"));
   Serial.println(F("  Lux reading every 1000 ms below:"));
   Serial.println(F("──────────────────────────────────────"));
@@ -129,10 +137,6 @@ void loop() {
 
   if (now - lastTime >= 1000) {
     lastTime = now;
-
-    // Re-trigger one-time measurement each cycle
-    lightMeter.begin(BH1750::ONE_TIME_HIGH_RES_MODE, 0x23);
-    delay(200);
 
     float lux = lightMeter.readLightLevel();
     Serial.print(F("  ["));
