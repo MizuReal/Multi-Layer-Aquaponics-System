@@ -1,0 +1,7 @@
+from(bucket: "sensor_data")
+  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)
+  |> filter(fn: (r) => r["_measurement"] == "sensor_data")
+  |> filter(fn: (r) => r["device"] == "esp32")
+  |> filter(fn: (r) => r["_field"] != "tds_quality" and r["_field"] != "aq_label")
+  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)
+  |> yield(name: "mean")
