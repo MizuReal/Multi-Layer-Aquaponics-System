@@ -90,8 +90,8 @@
 static const float R_AO          = 1000.0f;
 static const float R_GND         = 2200.0f;
 static const float DIVIDER_RATIO = R_GND / (R_AO + R_GND); // 0.6875
-static const float PH_SLOPE      = -8.73f;
-static const float PH_OFFSET     = 21.83f;
+static const float PH_SLOPE      = -8.58f;
+static const float PH_OFFSET     = 20.22f;
 static const float PH_LOW        = 6.0f;
 static const float PH_HIGH       = 8.0f;
 
@@ -171,8 +171,8 @@ bool  gsmReady      = false;
 int   gsmRSSI       = 0;
 int   gsmVoltage    = 0;          // mV from AT+CBC
 unsigned long lastAlertTime   = 0;
-unsigned long outOfRangeStart = 0;
-bool  wasOutOfRange           = false;
+bool  wasLow        = false;   // pH was below PH_LOW on previous tick
+bool  wasHigh       = false;   // pH was above PH_HIGH on previous tick
 uint32_t smsSent              = 0;
 
 // ── Ultrasonic state ─────────────────────────────────────────────
@@ -699,27 +699,29 @@ void loop() {
     float vadc = (raw / 4095.0f) * 3.3f;
     phValue    = PH_SLOPE * vadc + PH_OFFSET;
 
-    bool oor = (phValue < PH_LOW || phValue > PH_HIGH);
+    bool isLow  = (phValue < PH_LOW);
+    bool isHigh = (phValue > PH_HIGH);
 
-    if (oor && !wasOutOfRange) {
-      outOfRangeStart = now;
-      wasOutOfRange   = true;
-    } else if (!oor && wasOutOfRange) {
-      wasOutOfRange = false;
-      lastAlertTime = 0;
+    bool newEpisode = (isLow && !wasLow) || (isHigh && !wasHigh);
+
+    if ((isLow || isHigh) && gsmReady && newEpisode) {
+      sendSMS(phValue);
+      lastAlertTime = now;
+      String csq = sendAT("AT+CSQ");
+      int ci = csq.indexOf("+CSQ:");
+      if (ci != -1) gsmRSSI = csq.substring(ci + 5).toInt();
+    } else if ((isLow || isHigh) && gsmReady && (now - lastAlertTime >= ALERT_INTERVAL)) {
+      sendSMS(phValue);
+      lastAlertTime = now;
+      String csq = sendAT("AT+CSQ");
+      int ci = csq.indexOf("+CSQ:");
+      if (ci != -1) gsmRSSI = csq.substring(ci + 5).toInt();
     }
 
-    if (gsmReady && oor) {
-      bool first   = (lastAlertTime == 0);
-      bool elapsed = (now - lastAlertTime >= ALERT_INTERVAL);
-      if (first || elapsed) {
-        sendSMS(phValue);
-        lastAlertTime = now;
-        String csq = sendAT("AT+CSQ");
-        int ci = csq.indexOf("+CSQ:");
-        if (ci != -1) gsmRSSI = csq.substring(ci + 5).toInt();
-      }
-    }
+    if (!isLow && !isHigh) lastAlertTime = 0;
+
+    wasLow  = isLow;
+    wasHigh = isHigh;
   }
 
   // ── Timer 6 · MQ135 air quality (5000 ms) ────────────────────

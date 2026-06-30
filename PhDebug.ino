@@ -18,8 +18,8 @@ static const float R_GND         = 2200.0f;
 static const float DIVIDER_RATIO = R_GND / (R_AO + R_GND); // 0.6875
 
 // ── Calibration ──────────────────────────────────────────────────
-static const float PH_SLOPE  = -8.73f;
-static const float PH_OFFSET = 21.83f;
+static const float PH_SLOPE  = -8.58f;
+static const float PH_OFFSET = 20.22f;
 static const float PH_LOW    = 6.0f;
 static const float PH_HIGH   = 8.0f;
 
